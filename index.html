@@ -140,10 +140,6 @@
     </div>
     
     <audio id="bg-music" loop crossorigin="anonymous"></audio>
-    <!-- 烟花音效 -->
-    <audio id="firework-sound" preload="auto" crossorigin="anonymous">
-        <source src="https://assets.mixkit.co/sfx/preview/mixkit-firework-explosion-1899.mp3" type="audio/mp3">
-    </audio>
 
     <script type="module">
         import * as THREE from 'three';
@@ -163,29 +159,14 @@
                 white: 0xffffff,
                 barbieHot: 0xff1694,
                 barbieSoft: 0xffb7c5,
-                barbieViolet: 0xd461e3,
-                // 烟花主题配色
-                fireworkGold1: 0xffaa00, fireworkGold2: 0xff6600, // 黄金主题
-                fireworkIce1: 0x00ffff, fireworkIce2: 0xaaddff,   // 冰雪主题
-                fireworkBarbie1: 0xff1694, fireworkBarbie2: 0xd461e3 // 芭比主题
+                barbieViolet: 0xd461e3
             },
             particles: { 
                 count: 1800, dustCount: 1500, treeHeight: 28, treeRadius: 9,
                 snowCount: 2500, snowSpeed: 10 
             },
             camera: { z: 55 },
-            gestures: { palmOpenThreshold: 0.35, sensitivity: 6.0 },
-            // 烟花配置
-            firework: {
-                maxActive: 3, // 最大同时显示烟花数
-                particleCount: 200, // 单烟花粒子数
-                trailLength: 8, // 拖尾长度
-                launchSpeed: 80, // 升空速度
-                explodeSpeed: 40, // 爆炸速度
-                fadeTime: 2, // 粒子消失时间
-                sparkCount: 50, // 火星残留数量
-                triggerDebounce: 1000 // 触发防抖时间(ms)
-            }
+            gestures: { palmOpenThreshold: 0.35, sensitivity: 6.0 }
         };
 
         const STATE = {
@@ -198,16 +179,10 @@
             rotation: { x: 0, y: 0 }, spinVel: { x: 0, y: 0 }, time: 0,
             wasPointing: false, palmCenter: { x: 0.5, y: 0.5 }, hasPalmCenter: false,
             starMesh: null, starHaloMesh: null,
+            // 修改1：清空书信默认内容
             letterContent: "", 
             letterTyper: null, letterStartTimer: null, letterLastTriggerTime: 0,
             musicData: null,
-            // 烟花状态
-            firework: {
-                activeFireworks: [], // 活跃烟花列表
-                lastTriggerTime: 0, // 最后触发时间
-                particles: [], // 所有烟花粒子
-                sparkParticles: [] // 火星残留粒子
-            }
         };
 
         let scene, camera, renderer, composer, clock = new THREE.Clock();
@@ -215,9 +190,6 @@
         let galaxySystem = null; 
         let snowSystem = null;
         let heartSystem = null;
-        // 烟花相关
-        let fireworkTexture, sparkTexture;
-        let fireworkSound;
 
         let handLandmarker, video, drawingUtils, canvasCtx;
         let caneTexture, snowTexture, heartTexture, matLib = {};
@@ -225,7 +197,6 @@
         const _tempVec = new THREE.Vector3();
         const _targetVec = new THREE.Vector3();
         const _invMatrix = new THREE.Matrix4();
-        const _v3 = new THREE.Vector3(); // 临时向量
 
         async function init() {
             initThree();            
@@ -233,8 +204,6 @@
             setupLights();          
             createTextures();       
             createMaterials(); 
-            // 初始化烟花
-            initFirework();
             
             createGalaxyBackground(); 
             createSnowBackground();
@@ -275,36 +244,6 @@
             mainGroup = new THREE.Group(); mainGroup.rotation.x = 0.1; scene.add(mainGroup);
             starGroup = new THREE.Group(); mainGroup.add(starGroup);
             photoMeshGroup = new THREE.Group(); mainGroup.add(photoMeshGroup);
-        }
-
-        // 初始化烟花系统
-        function initFirework() {
-            // 加载烟花音效
-            fireworkSound = document.getElementById('firework-sound');
-            
-            // 创建烟花粒子纹理
-            const fireworkCanvas = document.createElement('canvas');
-            fireworkCanvas.width = 16;
-            fireworkCanvas.height = 16;
-            const fCtx = fireworkCanvas.getContext('2d');
-            const fGrad = fCtx.createRadialGradient(8, 8, 0, 8, 8, 8);
-            fGrad.addColorStop(0, 'rgba(255,255,255,1)');
-            fGrad.addColorStop(1, 'rgba(255,255,255,0)');
-            fCtx.fillStyle = fGrad;
-            fCtx.fillRect(0, 0, 16, 16);
-            fireworkTexture = new THREE.CanvasTexture(fireworkCanvas);
-
-            // 创建火星纹理
-            const sparkCanvas = document.createElement('canvas');
-            sparkCanvas.width = 8;
-            sparkCanvas.height = 8;
-            const sCtx = sparkCanvas.getContext('2d');
-            const sGrad = sCtx.createRadialGradient(4, 4, 0, 4, 4, 4);
-            sGrad.addColorStop(0, 'rgba(255,255,255,1)');
-            sGrad.addColorStop(1, 'rgba(255,255,255,0)');
-            sCtx.fillStyle = sGrad;
-            sCtx.fillRect(0, 0, 8, 8);
-            sparkTexture = new THREE.CanvasTexture(sparkCanvas);
         }
 
         function setupEnvironment() {
@@ -433,30 +372,6 @@
             matLib.dust = new THREE.MeshBasicMaterial({ color: 0xffffee, blending: THREE.AdditiveBlending });
             matLib.snowFlake = new THREE.PointsMaterial({ color: 0xffffff, size: 0.8, map: snowTexture, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
             matLib.heartFlake = new THREE.PointsMaterial({ color: CONFIG.colors.barbieHot, size: 1.5, map: heartTexture, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
-
-            // 烟花材质
-            matLib.firework = new THREE.PointsMaterial({
-                size: 2.0,
-                map: fireworkTexture,
-                transparent: true,
-                opacity: 1.0,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                sizeAttenuation: true,
-                vertexColors: true
-            });
-
-            // 火星材质
-            matLib.spark = new THREE.PointsMaterial({
-                size: 0.8,
-                map: sparkTexture,
-                transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                sizeAttenuation: true,
-                vertexColors: true
-            });
         }
 
         class Particle {
@@ -523,289 +438,6 @@
                     }
                 }
                 this.mesh.scale.lerp(_tempVec.set(s,s,s), 5*dt);
-            }
-        }
-
-        // 烟花类
-        class Firework {
-            constructor(targetPos) {
-                this.launchPos = new THREE.Vector3(
-                    (Math.random() - 0.5) * 40,
-                    -40,
-                    (Math.random() - 0.5) * 40
-                );
-                this.targetPos = targetPos || new THREE.Vector3(
-                    (Math.random() - 0.5) * 30,
-                    20 + Math.random() * 20,
-                    (Math.random() - 0.5) * 30
-                );
-                this.exploded = false;
-                this.launchTime = STATE.time;
-                this.explodeTime = 0;
-                this.lifeTime = CONFIG.firework.fadeTime;
-                
-                // 根据主题设置颜色
-                this.colors = this.getThemeColors();
-                
-                // 升空轨迹粒子
-                this.trailGeometry = new THREE.BufferGeometry();
-                this.trailPositions = new Float32Array(CONFIG.firework.trailLength * 3);
-                this.trailGeometry.setAttribute('position', new THREE.BufferAttribute(this.trailPositions, 3));
-                this.trailMaterial = new THREE.PointsMaterial({
-                    size: 1.0,
-                    color: this.colors.primary,
-                    transparent: true,
-                    opacity: 0.8,
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false
-                });
-                this.trail = new THREE.Points(this.trailGeometry, this.trailMaterial);
-                scene.add(this.trail);
-
-                // 爆炸粒子
-                this.explodeGeometry = new THREE.BufferGeometry();
-                this.explodePositions = new Float32Array(CONFIG.firework.particleCount * 3);
-                this.explodeColors = new Float32Array(CONFIG.firework.particleCount * 3);
-                this.explodeVelocities = [];
-                this.explodeAlphas = new Float32Array(CONFIG.firework.particleCount);
-                
-                // 初始化爆炸粒子
-                for (let i = 0; i < CONFIG.firework.particleCount; i++) {
-                    this.explodePositions[i * 3] = this.targetPos.x;
-                    this.explodePositions[i * 3 + 1] = this.targetPos.y;
-                    this.explodePositions[i * 3 + 2] = this.targetPos.z;
-                    
-                    // 随机颜色
-                    const color = new THREE.Color(
-                        Math.random() < 0.5 ? this.colors.primary : this.colors.secondary
-                    );
-                    this.explodeColors[i * 3] = color.r;
-                    this.explodeColors[i * 3 + 1] = color.g;
-                    this.explodeColors[i * 3 + 2] = color.b;
-                    
-                    // 随机速度
-                    const angle = Math.random() * Math.PI * 2;
-                    const phi = Math.random() * Math.PI;
-                    const speed = Math.random() * CONFIG.firework.explodeSpeed * 0.8 + CONFIG.firework.explodeSpeed * 0.2;
-                    this.explodeVelocities.push(new THREE.Vector3(
-                        Math.sin(phi) * Math.cos(angle) * speed,
-                        Math.cos(phi) * speed,
-                        Math.sin(phi) * Math.sin(angle) * speed
-                    ));
-                    
-                    this.explodeAlphas[i] = 1.0;
-                }
-                
-                this.explodeGeometry.setAttribute('position', new THREE.BufferAttribute(this.explodePositions, 3));
-                this.explodeGeometry.setAttribute('color', new THREE.BufferAttribute(this.explodeColors, 3));
-                this.explodeGeometry.setAttribute('alpha', new THREE.BufferAttribute(this.explodeAlphas, 1));
-                
-                this.explodeParticles = new THREE.Points(this.explodeGeometry, matLib.firework);
-                this.explodeParticles.visible = false;
-                scene.add(this.explodeParticles);
-            }
-
-            // 获取主题对应的烟花颜色
-            getThemeColors() {
-                const colors = CONFIG.colors;
-                switch (STATE.currentThemeIndex) {
-                    case 0: // 黄金主题
-                        return {
-                            primary: colors.fireworkGold1,
-                            secondary: colors.fireworkGold2
-                        };
-                    case 1: // 冰雪主题
-                        return {
-                            primary: colors.fireworkIce1,
-                            secondary: colors.fireworkIce2
-                        };
-                    case 2: // 芭比主题
-                        return {
-                            primary: colors.fireworkBarbie1,
-                            secondary: colors.fireworkBarbie2
-                        };
-                    default:
-                        return {
-                            primary: colors.fireworkGold1,
-                            secondary: colors.fireworkGold2
-                        };
-                }
-            }
-
-            // 创建火星残留
-            createSparks() {
-                const sparkGeometry = new THREE.BufferGeometry();
-                const sparkPositions = new Float32Array(CONFIG.firework.sparkCount * 3);
-                const sparkColors = new Float32Array(CONFIG.firework.sparkCount * 3);
-                const sparkVelocities = [];
-                
-                for (let i = 0; i < CONFIG.firework.sparkCount; i++) {
-                    sparkPositions[i * 3] = this.targetPos.x + (Math.random() - 0.5) * 10;
-                    sparkPositions[i * 3 + 1] = this.targetPos.y + (Math.random() - 0.5) * 10;
-                    sparkPositions[i * 3 + 2] = this.targetPos.z + (Math.random() - 0.5) * 10;
-                    
-                    const color = new THREE.Color(
-                        Math.random() < 0.5 ? this.colors.primary : this.colors.secondary
-                    );
-                    sparkColors[i * 3] = color.r;
-                    sparkColors[i * 3 + 1] = color.g;
-                    sparkColors[i * 3 + 2] = color.b;
-                    
-                    sparkVelocities.push(new THREE.Vector3(
-                        (Math.random() - 0.5) * 5,
-                        (Math.random() - 0.5) * 5,
-                        (Math.random() - 0.5) * 5
-                    ));
-                }
-                
-                sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
-                sparkGeometry.setAttribute('color', new THREE.BufferAttribute(sparkColors, 3));
-                
-                const sparkParticles = new THREE.Points(sparkGeometry, matLib.spark);
-                scene.add(sparkParticles);
-                
-                STATE.firework.sparkParticles.push({
-                    mesh: sparkParticles,
-                    velocities: sparkVelocities,
-                    startTime: STATE.time,
-                    lifeTime: 3.0
-                });
-            }
-
-            update(dt) {
-                const timeSinceLaunch = STATE.time - this.launchTime;
-                const launchDuration = this.targetPos.distanceTo(this.launchPos) / CONFIG.firework.launchSpeed;
-
-                // 升空阶段
-                if (!this.exploded) {
-                    if (timeSinceLaunch < launchDuration) {
-                        // 更新升空位置
-                        const progress = timeSinceLaunch / launchDuration;
-                        const currentPos = _v3.lerpVectors(this.launchPos, this.targetPos, progress);
-                        
-                        // 更新拖尾
-                        for (let i = CONFIG.firework.trailLength - 1; i > 0; i--) {
-                            this.trailPositions[i * 3] = this.trailPositions[(i - 1) * 3];
-                            this.trailPositions[i * 3 + 1] = this.trailPositions[(i - 1) * 3 + 1];
-                            this.trailPositions[i * 3 + 2] = this.trailPositions[(i - 1) * 3 + 2];
-                        }
-                        this.trailPositions[0] = currentPos.x;
-                        this.trailPositions[1] = currentPos.y;
-                        this.trailPositions[2] = currentPos.z;
-                        
-                        this.trailGeometry.attributes.position.needsUpdate = true;
-                        this.trailMaterial.opacity = Math.max(0, 0.8 - progress * 0.5);
-                    } else {
-                        // 到达目标点，触发爆炸
-                        this.exploded = true;
-                        this.explodeTime = STATE.time;
-                        this.explodeParticles.visible = true;
-                        scene.remove(this.trail);
-                        
-                        // 播放音效
-                        fireworkSound.currentTime = 0;
-                        fireworkSound.play().catch(e => console.log('Firework sound play failed:', e));
-                        
-                        // 创建火星残留
-                        this.createSparks();
-                    }
-                } else {
-                    // 爆炸阶段
-                    const timeSinceExplode = STATE.time - this.explodeTime;
-                    if (timeSinceExplode < this.lifeTime) {
-                        const progress = timeSinceExplode / this.lifeTime;
-                        
-                        // 更新爆炸粒子
-                        for (let i = 0; i < CONFIG.firework.particleCount; i++) {
-                            const idx = i * 3;
-                            this.explodePositions[idx] += this.explodeVelocities[i].x * dt;
-                            this.explodePositions[idx + 1] += this.explodeVelocities[i].y * dt;
-                            this.explodePositions[idx + 2] += this.explodeVelocities[i].z * dt;
-                            
-                            // 重力
-                            this.explodeVelocities[i].y -= 9.8 * dt;
-                            // 空气阻力
-                            this.explodeVelocities[i].multiplyScalar(0.98);
-                            
-                            // 透明度衰减
-                            this.explodeAlphas[i] = 1.0 - progress;
-                        }
-                        
-                        this.explodeGeometry.attributes.position.needsUpdate = true;
-                        this.explodeGeometry.attributes.alpha.needsUpdate = true;
-                        this.explodeParticles.material.opacity = 1.0 - progress;
-                    } else {
-                        // 移除爆炸粒子
-                        scene.remove(this.explodeParticles);
-                        this.explodeGeometry.dispose();
-                        return true; // 烟花生命周期结束
-                    }
-                }
-                return false;
-            }
-        }
-
-        // 触发烟花
-        function triggerFirework(targetPos) {
-            const now = Date.now();
-            // 防抖检查
-            if (now - STATE.firework.lastTriggerTime < CONFIG.firework.triggerDebounce) return;
-            STATE.firework.lastTriggerTime = now;
-            
-            // 检查最大活跃烟花数
-            if (STATE.firework.activeFireworks.length >= CONFIG.firework.maxActive) return;
-            
-            // 创建新烟花
-            const firework = new Firework(targetPos);
-            STATE.firework.activeFireworks.push(firework);
-        }
-
-        // 更新所有烟花
-        function updateFireworks(dt) {
-            // 更新活跃烟花
-            const toRemove = [];
-            for (let i = 0; i < STATE.firework.activeFireworks.length; i++) {
-                const firework = STATE.firework.activeFireworks[i];
-                if (firework.update(dt)) {
-                    toRemove.push(i);
-                }
-            }
-            
-            // 移除已结束的烟花
-            for (let i = toRemove.length - 1; i >= 0; i--) {
-                STATE.firework.activeFireworks.splice(toRemove[i], 1);
-            }
-            
-            // 更新火星残留
-            const sparkToRemove = [];
-            for (let i = 0; i < STATE.firework.sparkParticles.length; i++) {
-                const spark = STATE.firework.sparkParticles[i];
-                const timeSinceStart = STATE.time - spark.startTime;
-                
-                if (timeSinceStart < spark.lifeTime) {
-                    const positions = spark.mesh.geometry.attributes.position.array;
-                    for (let j = 0; j < CONFIG.firework.sparkCount; j++) {
-                        const idx = j * 3;
-                        positions[idx] += spark.velocities[j].x * dt;
-                        positions[idx + 1] += spark.velocities[j].y * dt;
-                        positions[idx + 2] += spark.velocities[j].z * dt;
-                        
-                        // 火星减速和重力
-                        spark.velocities[j].multiplyScalar(0.97);
-                        spark.velocities[j].y -= 4.9 * dt;
-                    }
-                    spark.mesh.geometry.attributes.position.needsUpdate = true;
-                    spark.mesh.material.opacity = 1.0 - (timeSinceStart / spark.lifeTime);
-                } else {
-                    scene.remove(spark.mesh);
-                    spark.mesh.geometry.dispose();
-                    sparkToRemove.push(i);
-                }
-            }
-            
-            // 移除已结束的火星
-            for (let i = sparkToRemove.length - 1; i >= 0; i--) {
-                STATE.firework.sparkParticles.splice(sparkToRemove[i], 1);
             }
         }
 
@@ -1127,6 +759,7 @@
             const modal = document.getElementById('letter-editor-modal'), txt = document.getElementById('letter-text-input');
             document.getElementById('btn-write-letter').onclick = (e) => { e.stopPropagation(); modal.style.display = 'flex'; txt.value = STATE.letterContent; };
             document.getElementById('btn-cancel-letter').onclick = (e) => { e.stopPropagation(); modal.style.display = 'none'; };
+            // 修改2：保存书信逻辑，允许用户清空内容，并保存为空字符串
             document.getElementById('btn-save-letter').onclick = (e) => { 
                 e.stopPropagation(); 
                 STATE.letterContent = txt.value.trim(); 
@@ -1148,8 +781,7 @@
                 if (i < STATE.letterContent.length) { display.textContent += STATE.letterContent.charAt(i++); display.scrollTop = display.scrollHeight; STATE.letterTyper = setTimeout(typeWriter, 100); }
                 else display.classList.remove('cursor');
             };
-            STATE.letterStartTimer = setTimeout(() => { if(STATE.mode==='LETTER') { display.classList.add('cursor'); typeWriter(); }
-                                                                   }, 2000);
+            STATE.letterStartTimer = setTimeout(() => { if(STATE.mode==='LETTER') { display.classList.add('cursor'); typeWriter(); } }, 2000);
         }
 
         function exitLetterMode() {
@@ -1204,8 +836,10 @@
             const dIndex = dist(8,0), dMiddle = dist(12,0), dRing = dist(16,0), dPinky = dist(20,0);
             const palmSize = dist(0, 9); 
 
-            // OK手势触发书信
+            // 修改3：OK手势触发书信逻辑
+            // 判断是否是 OK 手势 (拇指捏合食指，且中指伸直)
             if (dist(4,8) < 0.05 && dMiddle > 0.15 && dMiddle > dIndex * 1.2) {
+                // 新增判断：只有当 letterContent 不为空时才触发
                 if (STATE.letterContent && STATE.letterContent.trim() !== "") {
                     if (Date.now() - STATE.letterLastTriggerTime > 1000) { 
                         STATE.letterLastTriggerTime = Date.now(); 
@@ -1213,28 +847,6 @@
                     }
                 }
                 return;
-            }
-
-            // 手枪手势识别 (食指伸直，拇指弯曲，其余三指蜷缩)
-            const isIndexExtended = dIndex > palmSize * 1.5; // 食指伸直
-            const isThumbBent = dist(4, 2) < palmSize * 0.3; // 拇指弯曲
-            const isMiddleCurled = dMiddle < palmSize * 0.6; // 中指蜷缩
-            const isRingCurled = dRing < palmSize * 0.6;     // 无名指蜷缩
-            const isPinkyCurled = dPinky < palmSize * 0.6;   // 小指蜷缩
-            
-            const isPistolGesture = isIndexExtended && isThumbBent && isMiddleCurled && isRingCurled && isPinkyCurled;
-            
-            if (isPistolGesture) {
-                // 计算手势指向的3D目标位置
-                const x = (lm[8].x - 0.5) * 60;
-                const y = -(lm[8].y - 0.5) * 40;
-                const z = -20 + Math.random() * 10;
-                const targetPos = new THREE.Vector3(x, y, z);
-                
-                // 触发多个烟花（全屏效果）
-                for (let i = 0; i < 3; i++) {
-                    triggerFirework(targetPos);
-                }
             }
 
             const areFourFingersOpen = (dIndex > palmSize * 1.3) && 
@@ -1336,9 +948,6 @@
                 STATE.starMesh.rotation.y -= dt; STATE.starMesh.rotation.z = Math.sin(STATE.time) * 0.2;
                 STATE.starMesh.scale.setScalar(1.0 + Math.sin(STATE.time * 2) * 0.1);
             }
-
-            // 更新烟花系统
-            updateFireworks(dt);
 
             particleSystem.forEach(p => p.update(dt, STATE.time, STATE.mode, STATE.focusTarget, (STATE.mode === 'FOCUS' ? _invMatrix : null)));
             composer.render();
