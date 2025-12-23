@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Luxury Tree - Optimized Gestures</title>
+    <title>Luxury Tree - Hand Mask & Fireworks</title>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Ma+Shan+Zheng&display=swap');
@@ -59,9 +59,29 @@
         
         #file-input, #music-input, #import-input { display: none; }
 
-        #webcam-wrapper { position: absolute; bottom: 20px; right: 20px; opacity: 0; pointer-events: none; border: 1px solid rgba(212, 175, 55, 0.5); border-radius: 4px; background: #000; z-index: 50; display: flex; transition: opacity 0.5s; }
+        /* 摄像头容器样式优化 */
+        #webcam-wrapper { 
+            position: absolute; 
+            bottom: 20px; 
+            right: 20px; 
+            opacity: 0; 
+            pointer-events: none; 
+            border: 1px solid rgba(212, 175, 55, 0.5); 
+            border-radius: 8px; 
+            background: #000; /* 背景纯黑 */
+            z-index: 50; 
+            display: flex; 
+            transition: opacity 0.5s;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
         #webcam { display: none; }
-        #webcam-preview { width: 100%; height: 100%; transform: scaleX(-1); }
+        #webcam-preview { 
+            width: 100%; 
+            height: 100%; 
+            transform: scaleX(-1); /* 镜像翻转 */
+            background-color: #000; /* 画布背景纯黑 */
+        }
 
         #letter-editor-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; max-width: 500px; background: rgba(10, 10, 10, 0.95); border: 1px solid #d4af37; border-radius: 10px; padding: 20px; z-index: 200; display: none; flex-direction: column; gap: 15px; pointer-events: auto; }
         #letter-editor-modal h3 { color: #d4af37; margin: 0; text-align: center; }
@@ -243,11 +263,11 @@
             fireworkSystem = new FireworkSystem(scene);
         }
 
-        /* ================= 高级物理粒子烟花系统 ================= */
+        /* ================= 优化的物理粒子烟花系统 ================= */
         class FireworkSystem {
             constructor(scene) {
                 this.scene = scene;
-                this.maxParticles = 8000;
+                this.maxParticles = 10000; // 增加粒子数量
                 this.particles = [];
                 this.rockets = [];
                 
@@ -260,15 +280,15 @@
                 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
                 geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
+                // 创建更好的粒子贴图，中心亮边缘柔和
                 const canvas = document.createElement('canvas');
-                canvas.width = 64; canvas.height = 64;
+                canvas.width = 32; canvas.height = 32;
                 const ctx = canvas.getContext('2d');
-                const grad = ctx.createRadialGradient(32,32,0, 32,32,32);
+                const grad = ctx.createRadialGradient(16,16,0, 16,16,16);
                 grad.addColorStop(0.0, 'rgba(255,255,255,1)');
-                grad.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-                grad.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+                grad.addColorStop(0.4, 'rgba(255,255,255,0.4)');
                 grad.addColorStop(1.0, 'rgba(0,0,0,0)');
-                ctx.fillStyle = grad; ctx.fillRect(0,0,64,64);
+                ctx.fillStyle = grad; ctx.fillRect(0,0,32,32);
                 const tex = new THREE.CanvasTexture(canvas);
 
                 const material = new THREE.PointsMaterial({
@@ -282,93 +302,153 @@
                 
                 for(let i=0; i<this.maxParticles; i++) {
                     this.particles.push({
-                        index: i, active: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
-                        life: 0, maxLife: 0, r: 1, g: 1, b: 1, baseSize: 0, drag: 0.96, gravity: 12.0
+                        index: i, active: false, x: 0, y: 0, z: 0, 
+                        vx: 0, vy: 0, vz: 0,
+                        life: 0, maxLife: 0, r: 1, g: 1, b: 1, 
+                        baseSize: 0, drag: 0.95, gravity: 5.0
                     });
                 }
                 this.nextParticleIndex = 0;
             }
 
-            spawnParticle(x, y, z, vx, vy, vz, color, size, life, drag = 0.96, gravity = 12.0) {
+            spawnParticle(x, y, z, vx, vy, vz, color, size, life, drag = 0.96, gravity = 5.0) {
                 let p = this.particles[this.nextParticleIndex];
                 this.nextParticleIndex = (this.nextParticleIndex + 1) % this.maxParticles;
-                p.active = true; p.x = x; p.y = y; p.z = z; p.vx = vx; p.vy = vy; p.vz = vz;
-                p.r = color.r; p.g = color.g; p.b = color.b; p.life = life; p.maxLife = life;
+                
+                p.active = true; p.x = x; p.y = y; p.z = z;
+                p.vx = vx; p.vy = vy; p.vz = vz;
+                p.r = color.r; p.g = color.g; p.b = color.b;
+                p.life = life; p.maxLife = life;
                 p.baseSize = size; p.drag = drag; p.gravity = gravity;
             }
 
-            launch(handX, handY) {
-                const startX = (handX - 0.5) * 80; 
-                const startY = -40; 
-                const targetH = 10 + Math.random() * 25; 
+            launch(handNormalizedX, handNormalizedY) {
+                // 将 2D 手部坐标 (0-1) 映射到 3D 场景坐标
+                // 假设 z=0 平面，视锥体大概范围
+                const startX = (handNormalizedX - 0.5) * 80; // 扩大范围
+                const startY = -40; // 从底部发射
+                const targetX = startX; 
+                // 让烟花在屏幕上方爆炸，高度随机
+                const targetY = 15 + Math.random() * 20; 
+                
                 const hue = Math.random();
-                const color = new THREE.Color().setHSL(hue, 1.0, 0.7);
-                const shapes = ['SPHERE', 'HEART', 'STAR', 'BURST'];
+                const color = new THREE.Color().setHSL(hue, 1.0, 0.6);
+                
+                // 更多样的形状
+                const shapes = ['SPHERE', 'HEART', 'STAR', 'RING', 'BURST'];
                 const shape = shapes[Math.floor(Math.random() * shapes.length)];
 
+                // 计算发射速度，使其正好到达目标高度
+                // v^2 = u^2 + 2as => u = sqrt(-2as) roughly
+                const dist = targetY - startY;
+                const launchVy = Math.sqrt(2 * 15 * dist) * 0.12 + 35; // 模拟初速度
+
                 this.rockets.push({
-                    x: startX, y: startY, z: 0, vx: (Math.random() - 0.5) * 2.0, vy: 45 + Math.random() * 10,
-                    vz: (Math.random() - 0.5) * 2.0, targetY: targetH, color: color, shape: shape, hue: hue
+                    x: startX, y: startY, z: 0,
+                    vx: (Math.random() - 0.5) * 2.0, 
+                    vy: launchVy,
+                    vz: (Math.random() - 0.5) * 2.0,
+                    targetY: targetY, 
+                    color: color, 
+                    shape: shape, 
+                    hue: hue
                 });
             }
 
             explode(x, y, z, color, shape, baseHue) {
-                const explosionSpeed = 0.8 + Math.random() * 0.4;
+                const explosionForce = 1.0 + Math.random() * 0.5;
                 let count = 0;
                 
-                const addP = (vx, vy, vz, sColor = color, scale = 1.0) => {
-                    this.spawnParticle(x, y, z, vx * explosionSpeed * scale, vy * explosionSpeed * scale, vz * explosionSpeed * scale, sColor, 2.5 + Math.random() * 2.0, 1.5 + Math.random() * 0.5, 0.92, 6.0);
+                // 辅助函数：添加粒子
+                const addP = (vx, vy, vz, sColor = color, scale = 1.0, lifeMult = 1.0) => {
+                    this.spawnParticle(
+                        x, y, z, 
+                        vx * explosionForce * scale, 
+                        vy * explosionForce * scale, 
+                        vz * explosionForce * scale, 
+                        sColor, 
+                        2.0 + Math.random() * 1.5, // Size
+                        (1.0 + Math.random() * 0.8) * lifeMult, // Life
+                        0.92, // Drag (阻力)
+                        8.0   // Gravity (重力)
+                    );
                 };
 
                 if (shape === 'HEART') {
-                    count = 150;
+                    count = 200;
                     for (let i = 0; i < count; i++) {
                         const a = Math.random() * Math.PI * 2;
+                        // 心形公式
                         const hx = 16 * Math.pow(Math.sin(a), 3);
                         const hy = 13 * Math.cos(a) - 5 * Math.cos(2*a) - 2 * Math.cos(3*a) - Math.cos(4*a);
-                        const scale = 0.05;
-                        addP(hx * scale, hy * scale, (Math.random() - 0.5) * 0.5);
+                        // 稍微随机化厚度
+                        const rOffset = 0.8 + Math.random() * 0.4;
+                        addP(hx * 0.05 * rOffset, hy * 0.05 * rOffset, (Math.random()-0.5)*0.5);
                     }
                 } else if (shape === 'STAR') {
-                    count = 120;
+                    count = 150;
                     for (let i = 0; i < count; i++) {
                         const angle = (i / count) * Math.PI * 2;
                         const r = 2 + Math.cos(5 * angle); 
-                        addP(r * Math.cos(angle) * 0.3, r * Math.sin(angle) * 0.3, (Math.random()-0.5)*0.2);
+                        const speed = 0.8;
+                        addP(r * Math.cos(angle) * 0.4 * speed, r * Math.sin(angle) * 0.4 * speed, (Math.random()-0.5)*0.5);
                     }
-                } else if (shape === 'BURST') {
-                    count = 100;
-                    const c2 = new THREE.Color().setHSL((baseHue + 0.5)%1.0, 1.0, 0.6);
-                    for(let i=0; i<count; i++) {
-                        const theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1), speed = Math.random() * 2.0;
-                        addP(Math.sin(phi) * Math.cos(theta) * speed, Math.sin(phi) * Math.sin(theta) * speed, Math.cos(phi) * speed, speed > 1.0 ? color : c2, 1.2);
+                } else if (shape === 'RING') {
+                    count = 150;
+                    for (let i = 0; i < count; i++) {
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.random() * Math.PI; // Sphere
+                        // 变成环状，限制phi
+                        const r = 1.0;
+                        addP(r * Math.cos(theta), r * Math.sin(theta) * 0.1, r * Math.sin(theta), color, 0.8);
                     }
                 } else {
-                    count = 100;
+                    // SPHERE / BURST
+                    count = 200;
+                    const c2 = new THREE.Color().setHSL((baseHue + 0.1)%1.0, 1.0, 0.8); // 互补色
                     for(let i=0; i<count; i++) {
-                        const theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1), speed = 0.5 + Math.random() * 1.5;
-                        addP(Math.sin(phi) * Math.cos(theta) * speed, Math.sin(phi) * Math.sin(theta) * speed, Math.cos(phi) * speed);
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        const speed = 0.5 + Math.random() * 1.5;
+                        addP(
+                            Math.sin(phi) * Math.cos(theta) * speed, 
+                            Math.sin(phi) * Math.sin(theta) * speed, 
+                            Math.cos(phi) * speed,
+                            Math.random() > 0.7 ? c2 : color
+                        );
                     }
                 }
                 
-                for(let i=0; i<30; i++) {
-                    this.spawnParticle(x, y, z, (Math.random()-0.5)*3, (Math.random()-0.5)*3, (Math.random()-0.5)*3, new THREE.Color(0xffffff), 1.0, 0.6, 0.85, 3.0);
+                // 添加爆炸中心的闪光
+                for(let i=0; i<20; i++) {
+                    this.spawnParticle(x, y, z, (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, new THREE.Color(0xffffff), 3.0, 0.2, 0.8, 0);
                 }
             }
 
             update(dt) {
+                // 更新火箭
                 for(let i = this.rockets.length - 1; i >= 0; i--) {
                     const r = this.rockets[i];
-                    r.vy -= 15 * dt; r.x += r.vx * dt; r.y += r.vy * dt; r.z += r.vz * dt;
-                    if (Math.random() > 0.2) {
-                        this.spawnParticle(r.x + (Math.random()-0.5)*0.5, r.y, r.z + (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.2, -1.0, (Math.random()-0.5)*0.2, new THREE.Color(0xffaa55), 1.5, 0.3, 0.9, 0);
+                    r.vy -= 10 * dt; // 重力
+                    r.x += r.vx * dt; r.y += r.vy * dt; r.z += r.vz * dt;
+                    
+                    // 火箭尾迹
+                    if (Math.random() > 0.1) {
+                        this.spawnParticle(
+                            r.x + (Math.random()-0.5)*0.3, r.y, r.z + (Math.random()-0.5)*0.3, 
+                            0, -2.0, 0, 
+                            new THREE.Color(0xffcc88), 1.2, 0.4, 0.9, 0
+                        );
                     }
-                    if(r.y >= r.targetY || r.vy <= 0) {
+
+                    // 达到最高点或速度过低时爆炸
+                    if(r.y >= r.targetY || r.vy <= 5) {
                         this.explode(r.x, r.y, r.z, r.color, r.shape, r.hue);
                         this.rockets.splice(i, 1);
                     }
                 }
 
+                // 更新粒子
                 const positions = this.mesh.geometry.attributes.position.array;
                 const colors = this.mesh.geometry.attributes.color.array;
                 const sizes = this.mesh.geometry.attributes.size.array;
@@ -376,19 +456,31 @@
                 for(let i=0; i<this.maxParticles; i++) {
                     const p = this.particles[i];
                     if(!p.active) { sizes[i] = 0; continue; }
+                    
                     p.life -= dt;
                     if(p.life <= 0) { p.active = false; sizes[i] = 0; continue; }
                     
-                    p.vy -= p.gravity * dt; p.vx *= p.drag; p.vy *= p.drag; p.vz *= p.drag;
+                    // 物理模拟
+                    p.vy -= p.gravity * dt; 
+                    p.vx *= p.drag; p.vy *= p.drag; p.vz *= p.drag;
+                    
                     p.x += p.vx; p.y += p.vy; p.z += p.vz;
+                    
                     positions[i*3] = p.x; positions[i*3+1] = p.y; positions[i*3+2] = p.z;
                     
+                    // 颜色与闪烁处理
                     const progress = p.life / p.maxLife;
-                    const twinkle = Math.sin(progress * 20 + p.index) * 0.2 + 0.8;
-                    const intensity = Math.pow(progress, 1.5) * twinkle; 
-                    colors[i*3] = p.r * intensity; colors[i*3+1] = p.g * intensity; colors[i*3+2] = p.b * intensity;
-                    sizes[i] = p.baseSize * Math.sin(progress * Math.PI); 
+                    // 快结束时闪烁
+                    const blink = progress < 0.3 ? (Math.random() > 0.5 ? 0.0 : 1.0) : 1.0;
+                    const fade = Math.pow(progress, 0.5); // 非线性淡出
+                    
+                    colors[i*3] = p.r * fade * blink; 
+                    colors[i*3+1] = p.g * fade * blink; 
+                    colors[i*3+2] = p.b * fade * blink;
+                    
+                    sizes[i] = p.baseSize * fade; 
                 }
+                
                 this.mesh.geometry.attributes.position.needsUpdate = true;
                 this.mesh.geometry.attributes.color.needsUpdate = true;
                 this.mesh.geometry.attributes.size.needsUpdate = true;
@@ -893,38 +985,68 @@
             if (lastVideoTime !== video.currentTime && handLandmarker) {
                 lastVideoTime = video.currentTime;
                 const result = handLandmarker.detectForVideo(video, performance.now());
-                canvasCtx.clearRect(0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
-                canvasCtx.drawImage(video, 0, 0, canvasCtx.canvas.width, canvasCtx.canvas.height);
-                if (result.landmarks?.[0]) {
-                    drawingUtils.drawConnectors(result.landmarks[0], HandLandmarker.HAND_CONNECTIONS, { color: "#d4af37", lineWidth: 3 });
-                    drawingUtils.drawLandmarks(result.landmarks[0], { color: "#ffffff", lineWidth: 1, radius: 3 });
-                    processGestures(result.landmarks[0]);
-                } else STATE.hand.detected = false;
+                const width = canvasCtx.canvas.width;
+                const height = canvasCtx.canvas.height;
+
+                // 清空画布并填充黑色
+                canvasCtx.fillStyle = 'black';
+                canvasCtx.fillRect(0, 0, width, height);
+
+                if (result.landmarks && result.landmarks.length > 0) {
+                    const landmarks = result.landmarks[0];
+
+                    // --- 核心优化：只显示手部区域 ---
+                    canvasCtx.save();
+                    
+                    // 1. 创建手部骨骼形状作为裁剪蒙版
+                    canvasCtx.beginPath();
+                    canvasCtx.lineCap = 'round';
+                    canvasCtx.lineJoin = 'round';
+                    canvasCtx.lineWidth = 100; // 粗线条覆盖手部肌肤
+                    
+                    // 遍历所有骨骼连接来创建路径
+                    for (const connection of HandLandmarker.HAND_CONNECTIONS) {
+                        const start = landmarks[connection.start];
+                        const end = landmarks[connection.end];
+                        canvasCtx.moveTo(start.x * width, start.y * height);
+                        canvasCtx.lineTo(end.x * width, end.y * height);
+                    }
+                    // 补充指尖和掌心区域
+                    canvasCtx.stroke(); 
+                    
+                    // 2. 应用裁剪
+                    canvasCtx.clip();
+
+                    // 3. 绘制视频画面 (只在裁剪区域内显示)
+                    canvasCtx.drawImage(video, 0, 0, width, height);
+                    canvasCtx.restore();
+
+                    // 4. 在最上层绘制手部骨架指示器
+                    drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, { color: "#d4af37", lineWidth: 3 });
+                    drawingUtils.drawLandmarks(landmarks, { color: "#ffffff", lineWidth: 1, radius: 2 });
+                    
+                    processGestures(landmarks);
+                } else {
+                    STATE.hand.detected = false;
+                }
             }
             requestAnimationFrame(predictWebcam);
         }
 
-        // ======================= 优化的手势逻辑 =======================
         function processGestures(lm) {
             STATE.hand.detected = true;
             if (STATE.mode === 'LETTER') return;
 
             const dist = (i, j) => Math.hypot(lm[i].x - lm[j].x, lm[i].y - lm[j].y);
-            const scale = dist(0, 9); // 手掌大小基准 (腕部到中指根部)
+            const scale = dist(0, 9); 
 
-            // --- 1. 手指状态检测 (Finger State Detection) ---
-            // 判断标准：指尖到手腕的距离 > 阈值 (一般为scale * 1.5左右)
-            // 拇指比较特殊，判断指尖到小指根部的距离，如果远则为伸出
             const isThumbOpen = dist(4, 17) > scale * 1.5; 
             const isIndexOpen = dist(8, 0) > scale * 1.5;
             const isMiddleOpen = dist(12, 0) > scale * 1.5;
             const isRingOpen = dist(16, 0) > scale * 1.5;
             const isPinkyOpen = dist(20, 0) > scale * 1.5;
 
-            // --- 2. 优先级手势判断链 ---
-            
             // [优先级 1] OK 手势 (开启信件)
-            // 条件：拇指与食指靠得很近 + 中指伸直
             if (dist(4, 8) < scale * 0.3 && isMiddleOpen) {
                 if (STATE.letterContent && STATE.letterContent.trim() !== "") {
                     if (Date.now() - STATE.letterLastTriggerTime > 1500) { 
@@ -936,19 +1058,17 @@
             }
 
             // [优先级 2] 比枪手势 (发射烟花)
-            // 条件：拇指伸直 + 食指伸直 + 其他三指弯曲
-            // 严格互斥：如果拇指没伸直，就不会触发这个，避免和“指向”冲突
             if (isThumbOpen && isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
                 const now = Date.now();
                 if (now - STATE.lastFireworkTime > 300) {
                     STATE.lastFireworkTime = now;
+                    // 使用食指尖坐标发射
                     fireworkSystem.launch(1.0 - lm[8].x, lm[8].y);
                 }
                 return;
             }
 
             // [优先级 3] 点赞手势 (切换主题)
-            // 条件：拇指伸直 + 食指弯曲 (这很重要，区别于枪) + 其他弯曲
             if (isThumbOpen && !isIndexOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
                 if (STATE.isGestureSwitchEnabled) {
                     if (Date.now() - STATE.gestureDebounceTimer > 2000) { 
@@ -960,7 +1080,6 @@
             }
 
             // [优先级 4] 指向手势 (聚焦旋转)
-            // 条件：食指伸直 + 拇指弯曲 (区别于枪) + 其他弯曲
             if (isIndexOpen && !isThumbOpen && !isMiddleOpen && !isRingOpen && !isPinkyOpen) {
                 STATE.mode = 'FOCUS';
                 if (!STATE.wasPointing) {
@@ -968,13 +1087,12 @@
                     STATE.focusTarget = photos.length ? photos[(++STATE.currentPhotoIndex)%photos.length].mesh : STATE.starMesh;
                 }
                 STATE.wasPointing = true; STATE.hasPalmCenter = false; STATE.spinVel.x *= 0.9; STATE.spinVel.y *= 0.9;
-                return; // 结束判断
+                return; 
             } else {
                 STATE.wasPointing = false;
             }
 
             // [优先级 5] 张开手掌 (散开/旋转)
-            // 条件：至少4个手指伸直
             const openFingerCount = (isIndexOpen?1:0) + (isMiddleOpen?1:0) + (isRingOpen?1:0) + (isPinkyOpen?1:0);
             
             if (openFingerCount >= 4) {
@@ -982,7 +1100,6 @@
                     STATE.palmCenter = {x: lm[9].x, y: lm[9].y}; STATE.hasPalmCenter = true; STATE.gestureBaseSpread = scale; STATE.scatterScale = 1.0;
                 }
                 STATE.mode = 'SCATTER';
-                // 使用当前的scale对比初始scale来决定扩散程度
                 const currentSpread = scale;
                 if (STATE.gestureBaseSpread) STATE.scatterScale += (THREE.MathUtils.clamp(Math.pow(STATE.gestureBaseSpread/currentSpread, 2), 0.1, 5.0) - STATE.scatterScale) * 0.15;
                 
@@ -990,11 +1107,9 @@
                 STATE.spinVel.x += (THREE.MathUtils.clamp(-dy*gain, -3, 3) - STATE.spinVel.x) * 0.2;
                 STATE.spinVel.y += (THREE.MathUtils.clamp(dx*gain, -3, 3) - STATE.spinVel.y) * 0.2;
             } else {
-                // 默认状态：树模式
                 STATE.mode = 'TREE'; STATE.hasPalmCenter = false; STATE.scatterScale = 1.0; STATE.spinVel.x *= 0.9; STATE.spinVel.y *= 0.9;
             }
             
-            // 记录手掌中心位置用于后续平滑移动
             if (STATE.mode !== 'FOCUS') {
                 STATE.hand.x += ((lm[9].x - 0.5)*3.0 - STATE.hand.x) * 0.1;
                 STATE.hand.y += ((lm[9].y - 0.5)*3.0 - STATE.hand.y) * 0.1;
